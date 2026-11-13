@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">Grabador por Palabra Secreta</string>
+    <string name="title_configuration">Configuración de Palabras Clave</string>
+    <string name="label_keyword_start">Palabra para Iniciar Grabación:</string>
+    <string name="default_keyword_start">grabar</string>
+    <string name="label_keyword_stop">Palabra para Detener Grabación:</string>
+    <string name="default_keyword_stop">detener</string>
+    
+    <string name="title_service_control">Control de Detección</string>
+    <string name="btn_start_listening">Activar Escucha por Voz</string>
+    <string name="btn_stop_listening">Desactivar Escucha por Voz</string>
+    <string name="btn_manual_record_start">Grabar Manualmente</string>
+    <string name="btn_manual_record_stop">Detener Grabación Manual</string>
+    
+    <string name="status_idle">Estado: En espera (Inactivo)</string>
+    <string name="status_listening">Estado: Escuchando palabra clave...</string>
+    <string name="status_recording">Estado: ¡GRABANDO AUDIO!</string>
+    
+    <string name="title_recordings">Audios Grabados</string>
+    <string name="empty_recordings">No hay grabaciones guardadas aún.</string>
+    <string name="notification_channel_name">Servicio de Grabación de Audio</string>
+    <string name="notification_channel_desc">Notificación para mantener la detección y grabación activa en segundo plano</string>
+    
+    <string name="widget_description">Widget para iniciar o pausar la grabación de audio con un toque desde la pantalla de inicio.</string>
+    <string name="widget_title">Grabador Secreto</string>
+    <string name="widget_tap_to_record">Toca para Grabar</string>
+    <string name="widget_recording_now">Grabando... (Toca para Detener)</string>
+</resources>
+
