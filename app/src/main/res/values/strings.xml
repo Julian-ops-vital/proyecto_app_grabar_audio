@@ -5,25 +5,83 @@
     <string name="default_keyword_start">grabar</string>
     <string name="label_keyword_stop">Palabra para Detener Grabación:</string>
     <string name="default_keyword_stop">detener</string>
-    
+
     <string name="title_service_control">Control de Detección</string>
     <string name="btn_start_listening">Activar Escucha por Voz</string>
     <string name="btn_stop_listening">Desactivar Escucha por Voz</string>
     <string name="btn_manual_record_start">Grabar Manualmente</string>
     <string name="btn_manual_record_stop">Detener Grabación Manual</string>
-    
+
     <string name="status_idle">Estado: En espera (Inactivo)</string>
     <string name="status_listening">Estado: Escuchando palabra clave...</string>
     <string name="status_recording">Estado: ¡GRABANDO AUDIO!</string>
-    
-    <string name="title_recordings">Audios Grabados</string>
+
+    <string name="title_recordings">Audios grabados</string>
     <string name="empty_recordings">No hay grabaciones guardadas aún.</string>
     <string name="notification_channel_name">Servicio de Grabación de Audio</string>
     <string name="notification_channel_desc">Notificación para mantener la detección y grabación activa en segundo plano</string>
-    
+
     <string name="widget_description">Widget para iniciar o pausar la grabación de audio con un toque desde la pantalla de inicio.</string>
     <string name="widget_title">Grabador Secreto</string>
     <string name="widget_tap_to_record">Toca para Grabar</string>
     <string name="widget_recording_now">Grabando... (Toca para Detener)</string>
-</resources>
 
+    <!-- ===== REDISEÑO: pantalla principal ===== -->
+    <string name="toolbar_title">Grabador secreto</string>
+    <string name="chip_idle">En espera</string>
+    <string name="chip_listening">Escuchando…</string>
+    <string name="chip_recording">Grabando</string>
+    <string name="hint_idle">Toca el micrófono para grabar</string>
+    <string name="hint_listening">Di «%1$s» para empezar a grabar</string>
+    <string name="hint_recording">Toca para detener</string>
+    <string name="hint_recording_voice">Toca para detener o di «%1$s»</string>
+    <string name="voice_title">Escucha por voz</string>
+    <string name="voice_hint_full">Di «%1$s» para iniciar y «%2$s» para parar</string>
+    <string name="voice_hint_start_only">Di «%1$s» para iniciar la grabación</string>
+    <string name="tip_widget">Agrega el widget a tu inicio para grabar con 1 toque</string>
+    <string name="player_playing">Reproduciendo…</string>
+
+    <plurals name="recordings_count">
+        <item quantity="one">%d audio</item>
+        <item quantity="other">%d audios</item>
+    </plurals>
+
+    <!-- Descripciones de accesibilidad -->
+    <string name="cd_settings">Ajustes de palabras clave</string>
+    <string name="cd_record_start">Iniciar grabación</string>
+    <string name="cd_record_stop">Detener grabación</string>
+    <string name="cd_voice_switch">Escucha por voz</string>
+    <string name="cd_close">Cerrar</string>
+    <string name="cd_play_pause">Reproducir o pausar</string>
+    <string name="cd_play">Reproducir</string>
+    <string name="cd_pause">Pausar</string>
+    <string name="cd_more">Más opciones</string>
+
+    <!-- ===== REDISEÑO: filas de la lista ===== -->
+    <string name="menu_recording_rename">Renombrar</string>
+    <string name="menu_recording_share">Compartir</string>
+    <string name="menu_recording_delete">Eliminar</string>
+
+    <string name="rename_title">Renombrar grabación</string>
+    <string name="rename_hint">Nombre del audio</string>
+    <string name="rename_confirm">Guardar</string>
+    <string name="rename_done">Nombre actualizado</string>
+    <string name="rename_error_empty">Escribe un nombre</string>
+    <string name="rename_error_exists">Ya existe un audio con ese nombre</string>
+    <string name="rename_error_failed">No se pudo renombrar el archivo</string>
+    <string name="rename_error_missing">El archivo ya no existe</string>
+
+    <!-- ===== REDISEÑO: hoja de palabras clave ===== -->
+    <string name="sheet_title">Palabras clave</string>
+    <string name="sheet_description">Elige qué palabra inicia y cuál detiene la grabación cuando la escucha por voz está activada.</string>
+    <string name="sheet_label_start">Palabra para iniciar</string>
+    <string name="sheet_label_stop">Palabra para detener</string>
+    <string name="sheet_helper">Usa palabras distintas y fáciles de pronunciar</string>
+    <string name="sheet_folder_title">Carpeta de grabaciones</string>
+    <string name="sheet_folder_path">Recordings/AudiosSecretos · ábrela desde «Archivos»</string>
+    <string name="btn_sheet_cancel">Cancelar</string>
+    <string name="btn_sheet_save">Guardar</string>
+    <string name="error_keyword_empty">Escribe una palabra</string>
+    <string name="error_keyword_same">Usa palabras distintas</string>
+    <string name="keywords_saved">Palabras guardadas: «%1$s» y «%2$s»</string>
+</resources>

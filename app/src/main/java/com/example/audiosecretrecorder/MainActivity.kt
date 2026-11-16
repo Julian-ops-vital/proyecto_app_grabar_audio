@@ -3,33 +3,42 @@ package com.example.audiosecretrecorder
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
+import android.animation.ValueAnimator
 import android.view.View
-import android.view.animation.AlphaAnimation
-import android.view.animation.Animation
+import android.view.WindowManager
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.ColorRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audiosecretrecorder.databinding.ActivityMainBinding
+import com.example.audiosecretrecorder.databinding.DialogRenameBinding
 import com.example.audiosecretrecorder.model.RecordingModel
 import com.example.audiosecretrecorder.service.AudioRecordService
 import com.example.audiosecretrecorder.service.KeywordManager
+import com.example.audiosecretrecorder.ui.KeywordsBottomSheet
 import com.example.audiosecretrecorder.ui.RecordingsAdapter
 import com.example.audiosecretrecorder.util.WavHelper
 import java.io.File
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -40,7 +49,12 @@ class MainActivity : AppCompatActivity() {
     private var mediaPlayer: MediaPlayer? = null
     private var currentlyPlayingModel: RecordingModel? = null
     private val playerHandler = Handler(Looper.getMainLooper())
-    private var pulseAnimation: Animation? = null
+    private var pulseAnimator: ObjectAnimator? = null
+
+    // Para detectar el momento en que termina una grabación y refrescar la lista sola
+    private var wasRecording = false
+
+    private val prefs by lazy { getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
 
     // Manejador de permisos de Android en tiempo de ejecución
     private val permissionLauncher = registerForActivityResult(
@@ -87,11 +101,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         val filter = IntentFilter(AudioRecordService.BROADCAST_STATE_CHANGE)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(stateReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(stateReceiver, filter)
-        }
+        ContextCompat.registerReceiver(this, stateReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         updateUiState(
             AudioRecordService.isCurrentlyRecording,
@@ -111,6 +121,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        pulseAnimator?.cancel()
         stopAudioPlayback()
     }
 
@@ -135,42 +146,54 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupViews() {
-        // Cargar palabras clave guardadas
-        binding.etKeywordStart.setText(keywordManager.getStartWord())
-        binding.etKeywordStop.setText(keywordManager.getStopWord())
-
-        // Guardar nuevas palabras clave
-        binding.btnSaveKeywords.setOnClickListener {
-            val startWord = binding.etKeywordStart.text.toString().trim()
-            val stopWord = binding.etKeywordStop.text.toString().trim()
-
-            if (startWord.isEmpty() || stopWord.isEmpty()) {
-                Toast.makeText(this, "Las palabras clave no pueden estar vacías", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            keywordManager.setKeywords(startWord, stopWord)
-            Toast.makeText(this, "Palabras guardadas: '$startWord' y '$stopWord'", Toast.LENGTH_SHORT).show()
+        // Ajustes: abre la hoja inferior para editar las palabras clave
+        binding.btnSettings.setOnClickListener {
+            KeywordsBottomSheet
+                .newInstance(keywordManager.getStartWord(), keywordManager.getStopWord())
+                .show(supportFragmentManager, KeywordsBottomSheet.TAG)
         }
 
-        // Botón Activar / Desactivar Escucha por Voz
+        // Resultado de la hoja: aquí es donde realmente se guardan las palabras
+        supportFragmentManager.setFragmentResultListener(KeywordsBottomSheet.REQUEST_KEY, this) { _, result ->
+            val startWord = result.getString(KeywordsBottomSheet.KEY_START).orEmpty()
+            val stopWord = result.getString(KeywordsBottomSheet.KEY_STOP).orEmpty()
+
+            if (startWord.isNotEmpty() && stopWord.isNotEmpty()) {
+                keywordManager.setKeywords(startWord, stopWord)
+                Toast.makeText(
+                    this,
+                    getString(R.string.keywords_saved, startWord, stopWord),
+                    Toast.LENGTH_SHORT
+                ).show()
+                refreshVoiceHint()
+            }
+        }
+        refreshVoiceHint()
+
+        // Aviso del widget: se puede cerrar y no vuelve a aparecer
+        binding.cardTip.visibility =
+            if (prefs.getBoolean(PREF_TIP_DISMISSED, false)) View.GONE else View.VISIBLE
+        binding.btnTipClose.setOnClickListener {
+            binding.cardTip.visibility = View.GONE
+            prefs.edit().putBoolean(PREF_TIP_DISMISSED, true).apply()
+        }
+
+        // Switch Escucha por Voz
         binding.btnToggleVoice.setOnClickListener {
-            if (AudioRecordService.isVoiceListeningEnabled) {
+            val enabled = AudioRecordService.isVoiceListeningEnabled
+            // El estado real lo confirma el servicio por broadcast; mientras tanto
+            // el switch no se queda en un estado que todavía no es verdad.
+            binding.btnToggleVoice.isChecked = enabled
+            if (enabled) {
                 sendServiceAction(AudioRecordService.ACTION_STOP_SERVICE)
             } else {
                 sendServiceAction(AudioRecordService.ACTION_START_SERVICE)
             }
         }
 
-        // Botón Grabar / Detener Manual
+        // Botón grande: Grabar / Detener Manual
         binding.btnToggleManual.setOnClickListener {
             sendServiceAction(AudioRecordService.ACTION_TOGGLE_RECORD)
-        }
-
-        // Botón Refrescar lista
-        binding.btnRefreshList.setOnClickListener {
-            loadSavedRecordings()
-            Toast.makeText(this, "Lista de audios actualizada", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -185,63 +208,114 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Detener por voz solo funciona si el modelo offline de Vosk está instalado
+    private fun hasVoskModel(): Boolean = File(filesDir, "model-es").isDirectory
+
+    private fun refreshVoiceHint() {
+        val startWord = keywordManager.getStartWord()
+        val stopWord = keywordManager.getStopWord()
+        binding.tvVoiceHint.text = if (hasVoskModel()) {
+            getString(R.string.voice_hint_full, startWord, stopWord)
+        } else {
+            getString(R.string.voice_hint_start_only, startWord)
+        }
+    }
+
+    private fun applyStatusChip(text: String, @ColorRes bgColor: Int, @ColorRes textColor: Int) {
+        binding.tvStatusTitle.text = text
+        binding.tvStatusTitle.setTextColor(ContextCompat.getColor(this, textColor))
+        binding.tvStatusTitle.backgroundTintList = ContextCompat.getColorStateList(this, bgColor)
+        binding.tvStatusTitle.compoundDrawableTintList = ContextCompat.getColorStateList(this, textColor)
+    }
+
     private fun updateUiState(isRecording: Boolean, isListening: Boolean, seconds: Int, customStatus: String?) {
         if (isRecording) {
-            binding.tvStatusTitle.text = getString(R.string.status_recording)
-            binding.tvStatusTitle.setTextColor(ContextCompat.getColor(this, R.color.accent_recording))
+            applyStatusChip(
+                getString(R.string.chip_recording),
+                R.color.chip_recording_bg,
+                R.color.chip_recording_text
+            )
 
             val min = seconds / 60
             val sec = seconds % 60
-            binding.tvRecordingTimer.text = String.format("%02d:%02d", min, sec)
-            binding.tvRecordingTimer.visibility = View.VISIBLE
+            binding.tvRecordingTimer.text = String.format(Locale.getDefault(), "%02d:%02d", min, sec)
 
-            binding.ivMicStatus.setImageResource(R.drawable.ic_stop)
-            binding.ivMicStatus.setColorFilter(ContextCompat.getColor(this, R.color.accent_recording))
+            binding.btnToggleManual.setIconResource(R.drawable.ic_stop)
+            binding.btnToggleManual.backgroundTintList =
+                ContextCompat.getColorStateList(this, R.color.accent_recording)
+            binding.btnToggleManual.contentDescription = getString(R.string.cd_record_stop)
 
-            binding.btnToggleManual.text = getString(R.string.btn_manual_record_stop)
-            binding.btnToggleManual.backgroundTintList = ContextCompat.getColorStateList(this, R.color.accent_recording)
+            binding.tvHint.text = if (isListening && hasVoskModel()) {
+                getString(R.string.hint_recording_voice, keywordManager.getStopWord())
+            } else {
+                getString(R.string.hint_recording)
+            }
 
             startPulseAnimation()
         } else {
             stopPulseAnimation()
-            binding.tvRecordingTimer.visibility = View.GONE
-            binding.btnToggleManual.text = getString(R.string.btn_manual_record_start)
-            binding.btnToggleManual.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
+            binding.tvRecordingTimer.text = String.format(Locale.getDefault(), "%02d:%02d", 0, 0)
+
+            binding.btnToggleManual.setIconResource(R.drawable.ic_mic)
+            binding.btnToggleManual.backgroundTintList =
+                ContextCompat.getColorStateList(this, R.color.primary)
+            binding.btnToggleManual.contentDescription = getString(R.string.cd_record_start)
+
+            binding.btnToggleVoice.isChecked = isListening
 
             if (isListening) {
-                binding.tvStatusTitle.text = customStatus ?: getString(R.string.status_listening)
-                binding.tvStatusTitle.setTextColor(ContextCompat.getColor(this, R.color.accent_listening))
-                binding.ivMicStatus.setImageResource(R.drawable.ic_mic)
-                binding.ivMicStatus.setColorFilter(ContextCompat.getColor(this, R.color.accent_listening))
-
-                binding.btnToggleVoice.text = getString(R.string.btn_stop_listening)
-                binding.btnToggleVoice.backgroundTintList = ContextCompat.getColorStateList(this, R.color.accent_recording)
+                // El chip siempre lleva una etiqueta corta; el texto que manda el servicio
+                // (que puede ser largo o un aviso de error) va en la línea de abajo.
+                applyStatusChip(
+                    getString(R.string.chip_listening),
+                    R.color.chip_listening_bg,
+                    R.color.chip_listening_text
+                )
+                binding.tvHint.text = customStatus
+                    ?: getString(R.string.hint_listening, keywordManager.getStartWord())
             } else {
-                binding.tvStatusTitle.text = getString(R.string.status_idle)
-                binding.tvStatusTitle.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
-                binding.ivMicStatus.setImageResource(R.drawable.ic_mic)
-                binding.ivMicStatus.setColorFilter(ContextCompat.getColor(this, R.color.primary))
-
-                binding.btnToggleVoice.text = getString(R.string.btn_start_listening)
-                binding.btnToggleVoice.backgroundTintList = ContextCompat.getColorStateList(this, R.color.accent_listening)
+                applyStatusChip(
+                    getString(R.string.chip_idle),
+                    R.color.chip_idle_bg,
+                    R.color.chip_idle_text
+                )
+                binding.tvHint.text = getString(R.string.hint_idle)
             }
         }
+
+        // Al terminar una grabación, la lista se actualiza sola (ya no hay botón de refrescar)
+        if (wasRecording && !isRecording) {
+            binding.root.postDelayed({ loadSavedRecordings() }, 600)
+        }
+        wasRecording = isRecording
     }
 
+    // Aro que "respira" (escala + opacidad) mientras se graba
     private fun startPulseAnimation() {
-        if (pulseAnimation == null) {
-            pulseAnimation = AlphaAnimation(0.2f, 1.0f).apply {
-                duration = 600
-                repeatMode = Animation.REVERSE
-                repeatCount = Animation.INFINITE
-            }
-        }
         binding.viewPulse.visibility = View.VISIBLE
-        binding.viewPulse.startAnimation(pulseAnimation)
+        // Esta función se llama cada segundo con el cronómetro: no reiniciar si ya está corriendo
+        if (pulseAnimator?.isRunning == true) return
+
+        pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(
+            binding.viewPulse,
+            PropertyValuesHolder.ofFloat(View.SCALE_X, 0.88f, 1.0f),
+            PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.88f, 1.0f),
+            PropertyValuesHolder.ofFloat(View.ALPHA, 0.35f, 1.0f)
+        ).apply {
+            duration = 900
+            repeatMode = ValueAnimator.REVERSE
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
     }
 
     private fun stopPulseAnimation() {
-        binding.viewPulse.clearAnimation()
+        pulseAnimator?.cancel()
+        pulseAnimator = null
+        binding.viewPulse.scaleX = 1f
+        binding.viewPulse.scaleY = 1f
+        binding.viewPulse.alpha = 1f
         binding.viewPulse.visibility = View.INVISIBLE
     }
 
@@ -253,6 +327,7 @@ class MainActivity : AppCompatActivity() {
         adapter = RecordingsAdapter(
             recordings = emptyList(),
             onPlayClick = { item -> handlePlayRecording(item) },
+            onRenameClick = { item -> promptRenameRecording(item) },
             onShareClick = { item -> shareRecording(item) },
             onDeleteClick = { item -> confirmDeleteRecording(item) }
         )
@@ -267,9 +342,13 @@ class MainActivity : AppCompatActivity() {
         if (list.isEmpty()) {
             binding.tvEmptyList.visibility = View.VISIBLE
             binding.rvRecordings.visibility = View.GONE
+            binding.tvRecordingsCount.visibility = View.GONE
         } else {
             binding.tvEmptyList.visibility = View.GONE
             binding.rvRecordings.visibility = View.VISIBLE
+            binding.tvRecordingsCount.visibility = View.VISIBLE
+            binding.tvRecordingsCount.text =
+                resources.getQuantityString(R.plurals.recordings_count, list.size, list.size)
         }
     }
 
@@ -420,5 +499,83 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancelar", null)
             .show()
     }
-}
 
+    // ==========================================
+    // RENOMBRAR AUDIOS
+    // ==========================================
+
+    private fun promptRenameRecording(item: RecordingModel) {
+        val file = item.file
+        if (file == null || !file.exists()) {
+            Toast.makeText(this, R.string.rename_error_missing, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val dialogBinding = DialogRenameBinding.inflate(layoutInflater)
+        dialogBinding.etNewName.setText(file.nameWithoutExtension)
+        dialogBinding.etNewName.selectAll()
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.rename_title)
+            .setView(dialogBinding.root)
+            // El click real se asigna abajo para poder validar sin que el diálogo se cierre
+            .setPositiveButton(R.string.rename_confirm, null)
+            .setNegativeButton(R.string.btn_sheet_cancel, null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialogBinding.etNewName.requestFocus()
+            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val error = renameRecording(file, dialogBinding.etNewName.text.toString())
+                if (error == null) {
+                    dialog.dismiss()
+                    loadSavedRecordings()
+                    Toast.makeText(this, R.string.rename_done, Toast.LENGTH_SHORT).show()
+                } else {
+                    dialogBinding.tilNewName.error = getString(error)
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    /** Devuelve null si se renombró bien, o el texto de error (recurso) si no se pudo. */
+    private fun renameRecording(file: File, rawName: String): Int? {
+        // Quita caracteres que Android no permite en nombres de archivo
+        val cleanName = rawName
+            .replace(Regex("[\\\\/:*?\"<>|]"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .trim('.')
+            .take(80)
+            .trim()
+        if (cleanName.isEmpty()) return R.string.rename_error_empty
+
+        val extension = file.extension.ifEmpty { "wav" }
+        val newFile = File(file.parentFile, "$cleanName.$extension")
+
+        if (newFile.absolutePath == file.absolutePath) return null
+        if (newFile.exists()) return R.string.rename_error_exists
+        if (!file.renameTo(newFile)) return R.string.rename_error_failed
+
+        // Actualiza el índice del sistema para que la app "Archivos" vea el nombre nuevo
+        MediaScannerConnection.scanFile(
+            this,
+            arrayOf(file.absolutePath, newFile.absolutePath),
+            null,
+            null
+        )
+
+        if (currentlyPlayingModel?.file?.absolutePath == file.absolutePath) {
+            stopAudioPlayback()
+        }
+        return null
+    }
+
+    private companion object {
+        const val PREFS_NAME = "audio_secret_prefs"
+        const val PREF_TIP_DISMISSED = "tip_dismissed"
+    }
+}

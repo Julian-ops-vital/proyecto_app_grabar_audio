@@ -8,19 +8,29 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- Modern App Palette -->
-    <color name="primary">#1E88E5</color>
-    <color name="primary_dark">#1565C0</color>
-    <color name="primary_light">#BBDEFB</color>
-    <color name="accent_recording">#E53935</color>
+    <!-- Modern App Palette (rediseño: índigo) -->
+    <color name="primary">#3949AB</color>
+    <color name="primary_dark">#283593</color>
+    <color name="primary_light">#E3E7FA</color>
+    <color name="accent_recording">#C62828</color>
     <color name="accent_recording_light">#FFCDD2</color>
     <color name="accent_listening">#43A047</color>
     <color name="accent_listening_light">#C8E6C9</color>
-    
-    <color name="surface_card">#FFFFFF</color>
-    <color name="background_light">#F4F6F9</color>
-    <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
-    <color name="divider">#E0E0E0</color>
-</resources>
 
+    <color name="surface_card">#FFFFFF</color>
+    <color name="background_light">#F4F5FA</color>
+    <color name="text_primary">#1B1B1F</color>
+    <color name="text_secondary">#5A5D66</color>
+    <color name="divider">#E0E0E0</color>
+
+    <!-- Rediseño: chip de estado -->
+    <color name="chip_idle_bg">#ECEEF4</color>
+    <color name="chip_idle_text">#44474F</color>
+    <color name="chip_listening_bg">#DCEFE0</color>
+    <color name="chip_listening_text">#1B5E20</color>
+    <color name="chip_recording_bg">#FCE4E4</color>
+    <color name="chip_recording_text">#8C1D18</color>
+
+    <!-- Rediseño: aro que pulsa alrededor del botón mientras se graba -->
+    <color name="pulse_ring">#FCE4E4</color>
+</resources>
